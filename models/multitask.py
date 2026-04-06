@@ -16,6 +16,13 @@ from models.localization import LocalizationHead
 from models.segmentation import DecoderBlock
 
 
+"""
+links:-
+https://drive.google.com/file/d/1WF8cWBxjOZy7Shg9zsu1-GWwtX_icWmg/view?usp=sharing
+https://drive.google.com/file/d/1JOETyBwkM2gzNJRzoeOq3aRiLWbVh168/view?usp=sharing
+"""
+
+
 class MultiTaskPerceptionModel(nn.Module):
     """Shared VGG11 backbone with three task heads.
 
@@ -45,7 +52,7 @@ class MultiTaskPerceptionModel(nn.Module):
         # ------------------------------------------------------------------ #
         import gdown
         gdown.download(id='1WF8cWBxjOZy7Shg9zsu1-GWwtX_icWmg', output=classifier_path, quiet=False)
-        gdown.download(id='YOUR_LOCALIZER_DRIVE_ID',  output=localizer_path,  quiet=False)
+        gdown.download(id='1JOETyBwkM2gzNJRzoeOq3aRiLWbVh168',  output=localizer_path,  quiet=False)
         gdown.download(id='YOUR_UNET_DRIVE_ID',       output=unet_path,       quiet=False)
 
         # ------------------------------------------------------------------ #
