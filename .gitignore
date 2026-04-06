@@ -1,0 +1,12 @@
+venv/
+data/annotations/
+data/images/
+data/__pycache__/
+__pycache__/
+models/__pycache__/
+losses/__pycache__/
+*.pth
+*.pyc
+wandb/
+project/
+checkpoints/
