@@ -53,7 +53,7 @@ class MultiTaskPerceptionModel(nn.Module):
         import gdown
         gdown.download(id='1WF8cWBxjOZy7Shg9zsu1-GWwtX_icWmg', output=classifier_path, quiet=False)
         gdown.download(id='1JOETyBwkM2gzNJRzoeOq3aRiLWbVh168',  output=localizer_path,  quiet=False)
-        gdown.download(id='YOUR_UNET_DRIVE_ID',       output=unet_path,       quiet=False)
+        gdown.download(id='1JOETyBwkM2gzNJRzoeOq3aRiLWbVh168',       output=unet_path,       quiet=False)
 
         # ------------------------------------------------------------------ #
         # Shared encoder
