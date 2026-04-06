@@ -108,7 +108,7 @@ class MultiTaskPerceptionModel(nn.Module):
         if enc_s:
             self.encoder.load_state_dict(enc_s, strict=False)
             print('[MultiTask] Encoder loaded.')
-        head_s = {k.replace('head.', ''): v
+        head_s = {k[len('head.'):]: v
                   for k, v in cls_s.items() if k.startswith('head.')}
         if head_s:
             self.cls_head.load_state_dict(head_s, strict=False)
@@ -116,7 +116,7 @@ class MultiTaskPerceptionModel(nn.Module):
 
         # Localization head
         loc_s  = _load(loc_p)
-        loc_hs = {k.replace('head.', ''): v
+        loc_hs = {k[len('head.'):]: v
                   for k, v in loc_s.items() if k.startswith('head.')}
         if loc_hs:
             self.loc_head.load_state_dict(loc_hs, strict=False)
