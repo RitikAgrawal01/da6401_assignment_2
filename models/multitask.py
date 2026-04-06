@@ -1,175 +1,172 @@
-"""Unified multi-task model
-"""
+"""Unified multi-task model — root level as required by autograder.
 
-from typing import Dict
+Autograder import:
+    from multitask import MultiTaskPerceptionModel
+
+Downloads checkpoints from Google Drive via gdown in __init__.
+Replace the placeholder IDs with your actual Drive file IDs.
+"""
 
 import torch
 import torch.nn as nn
+from models.vgg11 import VGG11
+from models.layers import CustomDropout
+from models.classification import ClassificationHead
+from models.localization import LocalizationHead
+from models.segmentation import DecoderBlock
 
-from .vgg11 import VGG11Encoder
-from .layers import CustomDropout
-from .classification import ClassificationHead
-from .localization import LocalizationHead
-from .segmentation import DecoderBlock
 
 class MultiTaskPerceptionModel(nn.Module):
-    """Shared-backbone multi-task model."""
+    """Shared VGG11 backbone with three task heads.
 
-    def __init__(self, num_breeds: int = 37, seg_classes: int = 3, in_channels: int = 3, classifier_path: str = "classifier.pth", localizer_path: str = "localizer.pth", unet_path: str = "unet.pth"):
-        """
-        Initialize the shared backbone/heads using these trained weights.
-        Args:
-            num_breeds: Number of output classes for classification head.
-            seg_classes: Number of output classes for segmentation head.
-            in_channels: Number of input channels.
-            classifier_path: Path to trained classifier weights.
-            localizer_path: Path to trained localizer weights.
-            unet_path: Path to trained unet weights.
-        """
+    Args:
+        num_breeds      : Number of breed classes (37).
+        seg_classes     : Number of segmentation classes (3).
+        in_channels     : Input image channels (3).
+        classifier_path : Relative path to classifier checkpoint.
+        localizer_path  : Relative path to localizer checkpoint.
+        unet_path       : Relative path to unet checkpoint.
+    """
+
+    def __init__(
+        self,
+        num_breeds: int = 37,
+        seg_classes: int = 3,
+        in_channels: int = 3,
+        classifier_path: str = 'checkpoints/classifier.pth',
+        localizer_path: str  = 'checkpoints/localizer.pth',
+        unet_path: str       = 'checkpoints/unet.pth',
+    ):
         super().__init__()
- 
-        # ---- Shared encoder ------------------------------------------------ #
-        self.encoder = VGG11Encoder(in_channels=in_channels)
- 
-        # ---- Task heads ---------------------------------------------------- #
-        # Classification
+
+        # ------------------------------------------------------------------ #
+        # Download checkpoints from Google Drive
+        # Replace these IDs with your actual Drive file IDs from Step 2
+        # ------------------------------------------------------------------ #
+        import gdown
+        gdown.download(id='1WF8cWBxjOZy7Shg9zsu1-GWwtX_icWmg', output=classifier_path, quiet=False)
+        gdown.download(id='YOUR_LOCALIZER_DRIVE_ID',  output=localizer_path,  quiet=False)
+        gdown.download(id='YOUR_UNET_DRIVE_ID',       output=unet_path,       quiet=False)
+
+        # ------------------------------------------------------------------ #
+        # Shared encoder
+        # ------------------------------------------------------------------ #
+        self.encoder = VGG11(in_channels=in_channels)
+
+        # ------------------------------------------------------------------ #
+        # Classification head
+        # ------------------------------------------------------------------ #
         self.cls_pool    = nn.AdaptiveAvgPool2d((7, 7))
         self.cls_flatten = nn.Flatten()
         self.cls_head    = ClassificationHead(num_classes=num_breeds, dropout_p=0.5)
- 
-        # Localization
+
+        # ------------------------------------------------------------------ #
+        # Localization head
+        # ------------------------------------------------------------------ #
         self.loc_pool    = nn.AdaptiveAvgPool2d((7, 7))
         self.loc_flatten = nn.Flatten()
-        self.loc_head    = LocalizationHead(dropout_p=0.5, img_size=224)
- 
-        # Segmentation decoder (mirrors VGG11UNet structure)
-        self.bottleneck_drop = CustomDropout(p=0.5)
-        self.dec5 = DecoderBlock(in_ch=512, skip_ch=512, out_ch=512)
-        self.dec4 = DecoderBlock(in_ch=512, skip_ch=512, out_ch=256)
-        self.dec3 = DecoderBlock(in_ch=256, skip_ch=256, out_ch=128)
-        self.dec2 = DecoderBlock(in_ch=128, skip_ch=128, out_ch=64)
-        self.dec1 = DecoderBlock(in_ch=64,  skip_ch=64,  out_ch=32)
-        self.seg_final = nn.Conv2d(32, seg_classes, kernel_size=1)
- 
-        # ---- Load pre-trained weights -------------------------------------- #
-        self._load_weights(classifier_path, localizer_path, unet_path)
- 
-    # ----------------------------------------------------------------------- #
-    def _load_weights(
-        self,
-        classifier_path: str,
-        localizer_path:  str,
-        unet_path:       str,
-    ) -> None:
-        """Load trained weights from individual task checkpoints."""
- 
-        def _load(path: str) -> dict:
-            try:
-                ckpt = torch.load(path, map_location="cpu")
-                return ckpt.get("model_state_dict", ckpt)
-            except FileNotFoundError:
-                print(f"[MultiTask] Warning: checkpoint not found: '{path}'")
-                return {}
- 
-        # --- Encoder: load from classifier checkpoint ----------------------- #
-        cls_state = _load(classifier_path)
-        enc_state  = {k.replace("encoder.", ""): v
-                      for k, v in cls_state.items()
-                      if k.startswith("encoder.")}
-        if enc_state:
-            self.encoder.load_state_dict(enc_state, strict=False)
-            print("[MultiTask] Encoder loaded from classifier checkpoint.")
- 
-        # --- Classification head ------------------------------------------- #
-        head_state = {k.replace("head.", ""): v
-                      for k, v in cls_state.items()
-                      if k.startswith("head.")}
-        if head_state:
-            self.cls_head.load_state_dict(head_state, strict=False)
-            print("[MultiTask] Classification head loaded.")
- 
-        # --- Localization head --------------------------------------------- #
-        loc_state  = _load(localizer_path)
-        loc_hstate = {k.replace("head.", ""): v
-                      for k, v in loc_state.items()
-                      if k.startswith("head.")}
-        if loc_hstate:
-            self.loc_head.load_state_dict(loc_hstate, strict=False)
-            print("[MultiTask] Localization head loaded.")
- 
-        # --- Segmentation decoder ------------------------------------------ #
-        unet_state = _load(unet_path)
-        # Map decoder keys from VGG11UNet checkpoint
-        dec_keys = {
-            "dec5": self.dec5, "dec4": self.dec4, "dec3": self.dec3,
-            "dec2": self.dec2, "dec1": self.dec1,
-        }
-        for name, module in dec_keys.items():
-            sub = {k.replace(f"{name}.", ""): v
-                   for k, v in unet_state.items()
-                   if k.startswith(f"{name}.")}
-            if sub:
-                module.load_state_dict(sub, strict=False)
-        seg_final_state = {k.replace("final_conv.", ""): v
-                           for k, v in unet_state.items()
-                           if k.startswith("final_conv.")}
-        if seg_final_state:
-            self.seg_final.load_state_dict(seg_final_state, strict=False)
-        if unet_state:
-            print("[MultiTask] Segmentation decoder loaded.")
+        self.loc_head    = LocalizationHead(dropout_p=0.5)
 
-    def forward(self, x: torch.Tensor):
-        """Forward pass for multi-task model.
+        # ------------------------------------------------------------------ #
+        # Segmentation decoder
+        # ------------------------------------------------------------------ #
+        self.bottleneck_drop = CustomDropout(p=0.5)
+        self.dec5 = DecoderBlock(512, 512, 512)
+        self.dec4 = DecoderBlock(512, 512, 256)
+        self.dec3 = DecoderBlock(256, 256, 128)
+        self.dec2 = DecoderBlock(128, 128,  64)
+        self.dec1 = DecoderBlock( 64,  64,  32)
+        self.seg_final = nn.Conv2d(32, seg_classes, kernel_size=1)
+
+        # ------------------------------------------------------------------ #
+        # Load trained weights
+        # ------------------------------------------------------------------ #
+        self._load_weights(classifier_path, localizer_path, unet_path)
+
+    # ---------------------------------------------------------------------- #
+    def _load_weights(self, cls_p: str, loc_p: str, unet_p: str):
+        def _load(path):
+            try:
+                c = torch.load(path, map_location='cpu')
+                return c.get('model_state_dict', c)
+            except Exception as e:
+                print(f'[MultiTask] Warning loading {path}: {e}')
+                return {}
+
+        # Encoder + classification head from classifier checkpoint
+        cls_s = _load(cls_p)
+        enc_s = {k.replace('encoder.', ''): v
+                 for k, v in cls_s.items() if k.startswith('encoder.')}
+        if enc_s:
+            self.encoder.load_state_dict(enc_s, strict=False)
+            print('[MultiTask] Encoder loaded.')
+        head_s = {k.replace('head.', ''): v
+                  for k, v in cls_s.items() if k.startswith('head.')}
+        if head_s:
+            self.cls_head.load_state_dict(head_s, strict=False)
+            print('[MultiTask] Classification head loaded.')
+
+        # Localization head
+        loc_s  = _load(loc_p)
+        loc_hs = {k.replace('head.', ''): v
+                  for k, v in loc_s.items() if k.startswith('head.')}
+        if loc_hs:
+            self.loc_head.load_state_dict(loc_hs, strict=False)
+            print('[MultiTask] Localization head loaded.')
+
+        # Segmentation decoder
+        unet_s = _load(unet_p)
+        for name, mod in [('dec5', self.dec5), ('dec4', self.dec4),
+                          ('dec3', self.dec3), ('dec2', self.dec2),
+                          ('dec1', self.dec1)]:
+            sub = {k.replace(f'{name}.', ''): v
+                   for k, v in unet_s.items() if k.startswith(f'{name}.')}
+            if sub:
+                mod.load_state_dict(sub, strict=False)
+        fin = {k.replace('final_conv.', ''): v
+               for k, v in unet_s.items() if k.startswith('final_conv.')}
+        if fin:
+            self.seg_final.load_state_dict(fin, strict=False)
+        if unet_s:
+            print('[MultiTask] Segmentation decoder loaded.')
+
+    # ---------------------------------------------------------------------- #
+    def forward(self, x: torch.Tensor) -> dict:
+        """Single forward pass — three simultaneous outputs.
+
         Args:
-            x: Input tensor of shape [B, in_channels, H, W].
+            x: [B, 3, 224, 224]
+
         Returns:
-            A dict with keys:
-            - 'classification': [B, num_breeds] logits tensor.
-            - 'localization': [B, 4] bounding box tensor.
-            - 'segmentation': [B, seg_classes, H, W] segmentation logits tensor
+            dict:
+              'classification': [B, num_breeds]        logits
+              'localization'  : [B, 4]                 bbox pixel coords
+              'segmentation'  : [B, seg_classes, H, W] logits
         """
-        # ---- Shared encoder pass ------------------------------------------ #
+        # Shared encoder
         bottleneck, feats = self.encoder(x, return_features=True)
-        # bottleneck : [B, 512, 7, 7]
- 
-        # ---- Classification branch ---------------------------------------- #
-        cls_feat  = self.cls_pool(bottleneck)       # [B, 512, 7, 7]
-        cls_flat  = self.cls_flatten(cls_feat)      # [B, 25088]
-        cls_out   = self.cls_head(cls_flat)          # [B, 37]
- 
-        # ---- Localization branch ------------------------------------------ #
-        loc_feat  = self.loc_pool(bottleneck)       # [B, 512, 7, 7]
-        loc_flat  = self.loc_flatten(loc_feat)      # [B, 25088]
-        loc_out   = self.loc_head(loc_flat)          # [B, 4]
- 
-        # ---- Segmentation branch ------------------------------------------ #
-        bn = self.bottleneck_drop(bottleneck)
-        s  = self.dec5(bn,           feats["block5"])
-        s  = self.dec4(s,            feats["block4"])
-        s  = self.dec3(s,            feats["block3"])
-        s  = self.dec2(s,            feats["block2"])
-        s  = self.dec1(s,            feats["block1"])
-        seg_out = self.seg_final(s)                  # [B, 3, H, W]
- 
+
+        # Classification branch
+        cls_out = self.cls_head(
+            self.cls_flatten(self.cls_pool(bottleneck))
+        )
+
+        # Localization branch
+        loc_out = self.loc_head(
+            self.loc_flatten(self.loc_pool(bottleneck))
+        )
+
+        # Segmentation branch
+        s = self.bottleneck_drop(bottleneck)
+        s = self.dec5(s, feats['block5'])
+        s = self.dec4(s, feats['block4'])
+        s = self.dec3(s, feats['block3'])
+        s = self.dec2(s, feats['block2'])
+        s = self.dec1(s, feats['block1'])
+        seg_out = self.seg_final(s)
+
         return {
-            "classification": cls_out,
-            "localization":   loc_out,
-            "segmentation":   seg_out,
+            'classification': cls_out,
+            'localization':   loc_out,
+            'segmentation':   seg_out,
         }
- 
- 
-# --------------------------------------------------------------------------- #
-if __name__ == "__main__":
-    import os
-    # Without checkpoints — just test forward shape
-    model = MultiTaskPerceptionModel(
-        classifier_path="", localizer_path="", unet_path=""
-    )
-    model.eval()
-    x = torch.randn(2, 3, 224, 224)
-    with torch.no_grad():
-        out = model(x)
-    print("cls :", out["classification"].shape)  # [2, 37]
-    print("loc :", out["localization"].shape)     # [2, 4]
-    print("seg :", out["segmentation"].shape)     # [2, 3, 224, 224]
- 
