@@ -76,7 +76,7 @@ def get_transforms(train: bool):
                 A.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, p=0.5),
                 A.GaussNoise(p=0.2),
                 A.ShiftScaleRotate(shift_limit=0.1, scale_limit=0.2, rotate_limit=15, p=0.5),
-                A.CoarseDropout(max_holes=8, max_height=32, max_width=32, p=0.3),
+                A.CoarseDropout(num_holes_range=(1, 8), hole_height_range=(16, 32), hole_width_range=(16, 32), p=0.3),
             ])
         else:
             return None
@@ -135,6 +135,7 @@ def train_classification(args, device):
 
         model.eval()
         v_loss, v_correct, v_total = 0.0, 0, 0
+        all_preds, all_labels = [], []
         with torch.no_grad():
             for batch in val_loader:
                 imgs   = batch['image'].to(device)
@@ -143,11 +144,17 @@ def train_classification(args, device):
                 v_loss    += criterion(logits, labels).item() * imgs.size(0)
                 v_correct += (logits.argmax(1) == labels).sum().item()
                 v_total   += imgs.size(0)
+                all_preds.extend(logits.argmax(1).cpu().tolist())
+                all_labels.extend(labels.cpu().tolist())
         v_loss /= v_total; v_acc = v_correct / v_total
 
-        print(f'Epoch {epoch:3d}/{args.epochs} | Train loss={t_loss:.4f} acc={t_acc:.3f} | Val loss={v_loss:.4f} acc={v_acc:.3f}')
+        from sklearn.metrics import f1_score
+        v_f1 = f1_score(all_labels, all_preds, average='macro', zero_division=0)
+
+        print(f'Epoch {epoch:3d}/{args.epochs} | Train loss={t_loss:.4f} acc={t_acc:.3f} | Val loss={v_loss:.4f} acc={v_acc:.3f} F1={v_f1:.3f}')
         wandb.log({'cls/train_loss': t_loss, 'cls/train_acc': t_acc,
-                   'cls/val_loss': v_loss,   'cls/val_acc': v_acc, 'epoch': epoch})
+                   'cls/val_loss': v_loss,   'cls/val_acc': v_acc,
+                   'cls/val_f1': v_f1,       'epoch': epoch})
 
         if v_acc > best_val_acc:
             best_val_acc = v_acc
@@ -318,7 +325,7 @@ def train_segmentation(args, device):
                 preds   = logits.argmax(1)
                 v_pxc  += (preds == masks).sum().item()
                 v_pxt  += masks.numel()
-        v_loss /= len(val_ds); v_dice /= len(val_ds)
+        v_loss /= v_total; v_dice /= v_total
         v_pxacc = v_pxc / v_pxt
 
         print(f'Epoch {epoch:3d}/{args.epochs} | Train loss={t_loss:.4f} Dice={t_dice:.3f} | Val loss={v_loss:.4f} Dice={v_dice:.3f} PixAcc={v_pxacc:.3f}')

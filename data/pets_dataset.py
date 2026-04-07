@@ -257,12 +257,14 @@ class OxfordIIITPetDataset(Dataset):
         )                                   # H×W  LongTensor
 
         class_id = self._info[stem]["class_id"]
+        species  = self._info[stem]["species"]
 
         return {
             "image":    image_tensor,               # [3, H, W]  float
             "class_id": torch.tensor(class_id, dtype=torch.long),
             "bbox":     bbox_tensor,                # [4]        float  (pixel space)
             "mask":     mask_tensor,                # [H, W]     long
+            "species":  torch.tensor(species, dtype=torch.long),  # 1=cat 2=dog
             "stem":     stem,                       # for debugging
         }
 
