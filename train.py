@@ -312,7 +312,7 @@ def train_segmentation(args, device):
         t_loss /= t_total; t_dice /= t_total
 
         model.eval()
-        v_loss, v_dice, v_pxc, v_pxt = 0.0, 0.0, 0, 0
+        v_loss, v_dice, v_pxc, v_pxt, v_total = 0.0, 0.0, 0, 0, 0
         with torch.no_grad():
             for batch in val_loader:
                 imgs  = batch['image'].to(device)
@@ -325,6 +325,7 @@ def train_segmentation(args, device):
                 preds   = logits.argmax(1)
                 v_pxc  += (preds == masks).sum().item()
                 v_pxt  += masks.numel()
+                v_total += bs
         v_loss /= v_total; v_dice /= v_total
         v_pxacc = v_pxc / v_pxt
 
