@@ -76,8 +76,10 @@ class MultiTaskPerceptionModel(nn.Module):
         self.loc_head    = LocalizationHead(dropout_p=0.5)
 
         # ------------------------------------------------------------------ #
-        # Segmentation decoder
+        # Segmentation — separate encoder + decoder
+        # (UNet encoder was fine-tuned jointly with decoder; must stay paired)
         # ------------------------------------------------------------------ #
+        self.seg_encoder     = VGG11(in_channels=in_channels)
         self.bottleneck_drop = CustomDropout(p=0.5)
         self.dec5 = DecoderBlock(512, 512, 512)
         self.dec4 = DecoderBlock(512, 512, 256)
@@ -122,8 +124,12 @@ class MultiTaskPerceptionModel(nn.Module):
             self.loc_head.load_state_dict(loc_hs, strict=False)
             print('[MultiTask] Localization head loaded.')
 
-        # Segmentation decoder
+        # Segmentation decoder + its own encoder (from unet.pth)
         unet_s = _load(unet_p)
+        seg_enc_s = {k.replace('encoder.', ''): v
+                     for k, v in unet_s.items() if k.startswith('encoder.')}
+        if seg_enc_s:
+            self.seg_encoder.load_state_dict(seg_enc_s, strict=False)
         for name, mod in [('dec5', self.dec5), ('dec4', self.dec4),
                           ('dec3', self.dec3), ('dec2', self.dec2),
                           ('dec1', self.dec1)]:
@@ -151,7 +157,7 @@ class MultiTaskPerceptionModel(nn.Module):
               'localization'  : [B, 4]                 bbox pixel coords
               'segmentation'  : [B, seg_classes, H, W] logits
         """
-        # Shared encoder
+        # Shared encoder (classification + localization)
         bottleneck, feats = self.encoder(x, return_features=True)
 
         # Classification branch
@@ -164,13 +170,14 @@ class MultiTaskPerceptionModel(nn.Module):
             self.loc_flatten(self.loc_pool(bottleneck))
         )
 
-        # Segmentation branch
-        s = self.bottleneck_drop(bottleneck)
-        s = self.dec5(s, feats['block5'])
-        s = self.dec4(s, feats['block4'])
-        s = self.dec3(s, feats['block3'])
-        s = self.dec2(s, feats['block2'])
-        s = self.dec1(s, feats['block1'])
+        # Segmentation branch — uses its own fine-tuned encoder
+        seg_bn, seg_feats = self.seg_encoder(x, return_features=True)
+        s = self.bottleneck_drop(seg_bn)
+        s = self.dec5(s, seg_feats['block5'])
+        s = self.dec4(s, seg_feats['block4'])
+        s = self.dec3(s, seg_feats['block3'])
+        s = self.dec2(s, seg_feats['block2'])
+        s = self.dec1(s, seg_feats['block1'])
         seg_out = self.seg_final(s)
 
         return {
