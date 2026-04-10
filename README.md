@@ -1,3 +1,5 @@
+**Wandb Report Link:** https://api.wandb.ai/links/agrawalritik2001-/agzg27at  
+**Github Repo Link:** https://github.com/RitikAgrawal01/da6401_assignment_2
 # DA6401 Assignment-2 Skeleton Guide
 
 This repository is an instructional skeleton for building the complete visual perception pipeline on Oxford-IIIT Pet.
