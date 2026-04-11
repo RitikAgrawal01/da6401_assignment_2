@@ -1,12 +1,3 @@
-"""Unified multi-task model — root level as required by autograder.
-
-Autograder import:
-    from multitask import MultiTaskPerceptionModel
-
-Downloads checkpoints from Google Drive via gdown in __init__.
-Replace the placeholder IDs with your actual Drive file IDs.
-"""
-
 import torch
 import torch.nn as nn
 from models.vgg11 import VGG11
@@ -17,7 +8,7 @@ from models.segmentation import DecoderBlock
 
 
 """
-links:-
+Saved Model links:-
 https://drive.google.com/file/d/1WF8cWBxjOZy7Shg9zsu1-GWwtX_icWmg/view?usp=sharing
 https://drive.google.com/file/d/1JOETyBwkM2gzNJRzoeOq3aRiLWbVh168/view?usp=sharing
 https://drive.google.com/file/d/1j0_UAv7PgrXJwHF5-zwFQBh2l4AKF-Po/view?usp=sharing
@@ -49,7 +40,6 @@ class MultiTaskPerceptionModel(nn.Module):
 
         # ------------------------------------------------------------------ #
         # Download checkpoints from Google Drive
-        # Replace these IDs with your actual Drive file IDs from Step 2
         # ------------------------------------------------------------------ #
         import gdown
         gdown.download(id='1WF8cWBxjOZy7Shg9zsu1-GWwtX_icWmg', output=classifier_path, quiet=False)

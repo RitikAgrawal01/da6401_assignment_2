@@ -1,48 +1,104 @@
 **Wandb Report Link:** https://api.wandb.ai/links/agrawalritik2001-/agzg27at  
-**Github Repo Link:** https://github.com/RitikAgrawal01/da6401_assignment_2
-# DA6401 Assignment-2 Skeleton Guide
+**Github Repo Link:** https://github.com/RitikAgrawal01/da6401_assignment_2  
+**Wandb  Project Link:** https://wandb.ai/agrawalritik2001-/da6401-assignment2
 
-This repository is an instructional skeleton for building the complete visual perception pipeline on Oxford-IIIT Pet.
+**Name:** Ritik Agrawal  
+**Roll No:** DA25M026
 
+# 🐾 Multi-Task Pet Pipeline: Classification, Localization & Segmentation
 
-### ADDITIONAL INSTRUCTIONS FOR ASSIGNMENT2:
-- Ensure VGG11 is implemented according to the official paper(https://arxiv.org/abs/1409.1556). The only difference being injecting BatchNorm and CustomDropout layers is your design choice.
-- Train all the networks on normalized images as input (as the test set given by autograder will be normalized images).
-- The output of Localization model = [x_center, y_center, width, height] all these numbers are with respect to image coordinates, in pixel space (not normalized)
-- Train the object localization network with the following loss function: MSE + custom_IOU_loss.
-- Make sure the custom_IOU loss is in range: [0,1]
-- In the custom IOU loss, you have to implement all the two reduction types: ["mean", "sum"] and the default reduction type should be "mean". You may include any other reduction type as well, which will help your network learn better.
-- multitask.py shd load the saved checkpoints (classifier.pth, localizer.pth, unet.pth), initialize the shared backbone and heads with these trained weights and do prediction.
-- Keep paths as relative paths for loading in multitask.py
-- Assume input image size is fixed according to vgg11 paper(can be hardcoded need not pass as args)
-- Stick to the arguments of the functions and classes given in the github repo, if you include any additional arguments make sure they always have some default value.
-- Do not import any other python packages apart from the ones mentioned in assignment pdf, if you do so the autograder will instantly crash and your submission will not be evaluated.
-- The following classes will be used by autograder: 
-    ```
-        from models.vgg11 import VGG11
-        from models.layers import CustomDropout
-        from losses.iou_loss import IoULoss
-        from multitask import MultiTaskPerceptionModel
-    ```
-- The submission link for this assignment will be available by Saturday(04/04/2026) on gradescope
-
-
-
-
-
-### GENERAL INSTRUCTIONS:
-- From this assignment onwards, if we find any wandb report which is private/inaccessible while grading, there wont be any second chance, that submission will be marked 0 for wandb marks.
-- The entireity of plots presented in the wandb report should be interactive and logged in the wandb project. Any screenshot or images of plots will straightly be marked 0 for that question.
-- Gradescope offers an option to activate whichever submission you want to, and that submission will be used for evaluation. Under any circumstances, no requests to be raised to TAs to activate any of your prior submissions. It is the student's responsibility to do so(if required) before submission deadline.
-- Assignment2 discussion forum has been opened on moodle for any doubt clarification/discussion.   
-
-
-
-
-## Contact
-
-For questions or issues, please contact the teaching staff or post on the course forum.
+This project implements a unified **multi-task deep learning architecture** using a shared VGG11 encoder to simultaneously perform breed classification, head localization (bounding boxes), and pixel-level segmentation on the Oxford-IIIT Pet Dataset.
 
 ---
 
-Good luck with your implementation!
+## 📌 Project Highlights
+
+- ✅ **Unified Multi-Task Architecture:** Single shared encoder with three specialized task heads.
+- ✅ **Extensive Experimentation:** - Impact of **Batch Normalization** on convergence.
+  - **Dropout Ablation** studies ($p=0.0$ to $0.5$).
+  - **Transfer Learning** strategies (Frozen vs. Fine-tuned).
+- ✅ **Visual Analysis:** Deep dive into feature maps, detection overlays, and segmentation masks.
+- ✅ **Real-World Evaluation:** End-to-end testing on "in-the-wild" images.
+- ✅ **Experiment Tracking:** Fully integrated with **Weights & Biases (W&B)**.
+
+---
+
+## 🏗️ Architecture Overview
+
+The model utilizes a **VGG11 backbone** as a shared feature extractor, branching into three distinct heads:
+
+1.  **Classification Head:** Fully connected layers + Dropout → Breed Prediction (37 classes).
+2.  **Localization Head:** Regression head → Bounding Box ($x, y, w, h$).
+3.  **Segmentation Head:** U-Net style decoder → Trimap Mask (3 classes)
+
+---
+
+## 📊 Dataset: Oxford-IIIT Pet
+- **Scope:** 37 pet breeds (cats & dogs).
+- **Annotations:** - Pixel-level segmentation masks (trimaps).
+  - Bounding box annotations (head region).
+
+---
+
+## ⚙️ Training & Experiments
+
+### 🔹 Task 2.1 — Batch Normalization Analysis
+Compared models with and without BatchNorm. Findings showed that BatchNorm significantly improved training stability and gradient flow, allowing for higher learning rates and faster convergence.
+
+### 🔹 Task 2.2 — Dropout Ablation
+Tested dropout rates $p \in \{0.0, 0.2, 0.5\}$. We observed that $p=0.2$ provided the optimal balance between training accuracy and validation generalization.
+
+### 🔹 Task 2.3 — Transfer Learning
+| Strategy | Description | Result |
+| :--- | :--- | :--- |
+| **Frozen Encoder** | Weights locked; only heads trained. | Limited performance. |
+| **Partial Fine-tuning** | Last few layers of VGG11 unfrozen. | Good trade-off. |
+| **Full Fine-tuning** | All weights updated. | **Best overall performance.** |
+
+---
+
+## 📈 Evaluation Metrics
+
+| Task | Metrics | Final Score |
+| :--- | :--- | :--- |
+| **Classification** | Accuracy / Macro F1 | **1.00 / 1.00** |
+| **Localization** | Mean IoU | **0.79** |
+| **Segmentation** | Mean Dice Score | **0.86** |
+| **Segmentation** | Pixel Accuracy | **0.93** |
+
+> **Note:** While Pixel Accuracy is high, the **Dice Score** proved more reliable due to the class imbalance inherent in segmentation trimaps.
+
+---
+
+## 🔍 Key Insights
+
+- **Feature Maps:** Early layers capture edges/textures; deeper layers represent semantic features like ears and snouts.
+- **Localization Challenges:** Model performance dips in cluttered backgrounds or unusual animal poses.
+- **Generalization:** The pipeline is robust for clear subjects in "in-the-wild" images, though localization is more sensitive to environment noise than classification.
+
+---
+
+## 🛠️ Tech Stack
+
+- **Framework:** PyTorch & Torchvision
+- **Tracking:** Weights & Biases (W&B)
+- **Environment:** Kaggle GPU / Jupyter
+- **Libraries:** NumPy, Matplotlib, OpenCV
+
+---
+
+## 📦 Project Structure
+
+```text
+├── models/
+│   ├── vgg11.py        # Backbone definitions
+│   ├── multitask.py    # Multi-head logic
+│   └── unet.py         # Segmentation decoder
+├── datasets/
+│   └── oxford_pet.py   # Custom Dataset & Transforms
+├── wandb_exp.ipynb
+├── checkpoints/        # Saved model weights
+├── utils/
+│   └── helpers.py      # IoU & Dice calculation logic
+└── README.md
+```
